@@ -114,6 +114,14 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keep DNS servers alive while tethering services are active" />
         </service>
+        <service
+            android:name=".control.ControlService"
+            android:directBootAware="true"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Shell-driven control plane for headless tethering deployments" />
+        </service>
 
         <service
             android:name=".manage.RepeaterTileService"

@@ -46,7 +46,10 @@ import kotlinx.coroutines.DEBUG_PROPERTY_VALUE_ON
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.io.File
 import java.lang.invoke.MethodType
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 class App : Application() {
@@ -97,6 +100,7 @@ class App : Application() {
                 }
             } else isCrashlyticsCollectionEnabled = false
         }
+        Timber.plant(FileLogTree())
         Timber.plant(object : Timber.DebugTree() {
             @SuppressLint("LogNotTimber")
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
@@ -194,5 +198,45 @@ class App : Application() {
                 setToolbarColor(resources.getColor(R.color.dark_colorPrimary, theme))
             }.build())
         }.build()
+    }
+}
+
+/**
+ * Append-only file log for headless deployments: `adb shell su -c 'cat /data/data/be.mygod.vpnhotspot/files/debug.log'`
+ * must be able to answer "what did the app actually do" even when release-level logcat filtering
+ * or an unattended device hides the interesting lines.
+ */
+private class FileLogTree : Timber.Tree() {
+    companion object {
+        private const val MAX_BYTES = 4L shl 20
+        private const val KEEP_BYTES = 1024L shl 10
+        private val PRIORITIES = charArrayOf('?', 'V', 'D', 'I', 'W', 'E', 'A')
+    }
+
+    private val timeFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US)
+    private val lock = Any()
+
+    override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+        val line = buildString {
+            append(timeFormat.format(Date())).append(' ').append(PRIORITIES[priority]).append('/')
+            append(tag ?: "Timber").append(": ").append(message)
+            if (t != null) {
+                append('\n').append(android.util.Log.getStackTraceString(t))
+            }
+        }
+        synchronized(lock) {
+            try {
+                val file = File(App.app.deviceStorage.filesDir, "debug.log")
+                if (file.length() > MAX_BYTES) {
+                    val keep = file.readBytes().copyOfRange(
+                        (file.length() - KEEP_BYTES).toInt().coerceAtLeast(0), file.length().toInt())
+                    val start = keep.indexOf('\n'.code.toByte()) + 1
+                    file.writeBytes(if (start in 1..keep.size) keep.copyOfRange(start, keep.size) else keep)
+                }
+                file.appendText(line + '\n')
+            } catch (_: Exception) {
+                // logging must never crash the app; drop the line
+            }
+        }
     }
 }
