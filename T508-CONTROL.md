@@ -66,6 +66,14 @@ export PATH=$HOME/.cargo/bin:$PATH   # cargo-ndk + 4 个 android rust target
 `3.0.8-t508.1`（versionCode 2012）。applicationId 保持 `be.mygod.vpnhotspot`
 （google-services.json 绑定此包名；装机时卸掉原版避免冲突）。
 
+## 已知小瑕疵 / TODO
+
+- STATUS 的 `ap config` 段报 InvocationTargetException：此 ROM 上 `WifiApManager.configuration`
+  反射读取失败。**写路径正常**（SETUP 实证 `ssid="T508N-Net"` 落盘），只影响状态展示不影响功能。
+  修法：STATUS 读配置也走 root 回退（`WifiApCommands.GetConfiguration`），下次改代码时顺手做。
+- 卸载重装 fork 后首次启动可能撞 zygote CE 目录竞态（`Unable to find pkg:uid in /data_mirror`，
+  进程 start timeout）。等待数秒重试 `am` 即自愈；必要时 root 手工 `mkdir -p /data/data/<pkg>`。
+
 ## 同步上游
 
 ```bash
